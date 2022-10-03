@@ -11,6 +11,7 @@ __.csv__ y __.json__; adicionalmente lo comprime en un __.zip__ y lo descarga.
 
 # Ejecución
 
+- Debido a que es un proyecto con TypeScript, el proyecto debe ser compilado mediantes el comando ```tsc```
 - Iniciar el proyecto (_dist/app.js_), mediante ```npm start```
 - Puerto configurado por defecto: ```8080```
 - Consumir el endpoint de tipo GET ```http://localhost:8080/generateFile```

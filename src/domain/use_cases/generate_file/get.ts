@@ -1,7 +1,8 @@
-import fetch, {Response} from 'node-fetch';
+import fs from "fs";
+import fetch, {Response} from "node-fetch";
+import JSZip from "jszip";
 import {GenerateFileModel} from "../../models/generate_file/get";
 import {Character, CharactersAPIResp} from "../../models/characters/characters";
-import fs from "fs";
 
 export class GenerateFileUseCases {
     private readonly name: string;
@@ -28,7 +29,7 @@ export class GenerateFileUseCases {
     }
 
     // Genera y guarda un archivo .csv
-    private async generateCSV(characters: Character[]): Promise<string> {
+    private async generateCSV(characters: Character[]): Promise<string | null> {
         let csv: string = 'Nombre,Estado,Especie\n';
         const fileName: string = `${Date.now()}.csv`;
 
@@ -40,19 +41,43 @@ export class GenerateFileUseCases {
             await fs.writeFileSync(fileName, csv, 'utf8');
             return fileName;
         } catch (error) {
-            return '';
+            return null;
         }
     }
 
     // Genera y guarda un archivo .json
-    private async generateJSON(apiResp: CharactersAPIResp): Promise<string> {
+    private async generateJSON(apiResp: CharactersAPIResp): Promise<string | null> {
         const fileName: string = `${Date.now()}.json`;
 
         try {
             await fs.writeFileSync(fileName, JSON.stringify(apiResp), 'utf8');
             return fileName;
         } catch (error) {
-            return '';
+            return null;
+        }
+    }
+
+    // Genera el archivo CSV
+    private async generateZIP(csv: string, json: string): Promise<string | null> {
+        const zip: JSZip = new JSZip();
+        const fileName: string = `${Date.now()}.zip`;
+
+        try {
+            const readCSV = fs.readFileSync(csv);
+            zip.file('RickAndMorty.csv', readCSV);
+
+            const readJSON = fs.readFileSync(json);
+            zip.file('RickAndMorty.json', readJSON);
+
+            await zip.generateNodeStream({type: 'nodebuffer', streamFiles: true})
+                .pipe(fs.createWriteStream(fileName))
+                .on('finish', () => {
+                    console.log('Archivo .ZIP generado correctamente.');
+                });
+
+            return fileName;
+        } catch (error) {
+            return null;
         }
     }
 
@@ -83,10 +108,29 @@ export class GenerateFileUseCases {
         }
 
         // Genera el archivo CSV
-        const fileCSV: string = await this.generateCSV(api.results!);
+        const fileCSV: string | null = await this.generateCSV(api.results!);
 
         // Genera el archivo JSON
-        const fileJSON: string = await this.generateJSON(api!);
+        const fileJSON: string | null = await this.generateJSON(api!);
+
+        // En caso de que los dos archivos no se generen
+        if (!fileCSV && !fileJSON) {
+            response.status = 400;
+            response.message = 'No se generaron los archivo CSV y JSON, no se genero el archivo ZIP.';
+            return response;
+        }
+
+        // Genera el archivo ZIP
+        const generateZIP: string | null = await this.generateZIP(fileCSV!, fileJSON!);
+
+        // En caso de que el ZIP no se genere
+        if (!generateZIP) {
+            response.status = 400;
+            response.message = 'No se genero el archivo ZIP.';
+            return response;
+        }
+
+        response.message = `El archivo ZIP se genero correctamente en la raíz del proyecto con el nombre ${generateZIP}`
 
         return response;
     }
